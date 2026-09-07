@@ -63,6 +63,42 @@ class Charging_screenView extends WatchUi.View {
         }
     }
 
+    // Color for the battery level: red when low, yellow mid, green when high/full
+    private function batteryColor(percent as Float) as Graphics.ColorType {
+        if (percent >= 80) {
+            return Graphics.COLOR_GREEN;
+        } else if (percent >= 30) {
+            return Graphics.COLOR_YELLOW;
+        }
+        return Graphics.COLOR_RED;
+    }
+
+    // Draws a horizontal battery icon (outline + cap + fill) centered at centerX, top at y.
+    // Returns the total height consumed.
+    private function drawBatteryIcon(dc as Dc, centerX as Number, y as Number, percent as Float) as Number {
+        var barW = 90;
+        var barH = 36;
+        var capW = 6;
+        var capH = 16;
+        var pad = 3;
+
+        var left = centerX - (barW + capW) / 2;
+        var top = y;
+
+        dc.setPenWidth(2);
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawRoundedRectangle(left, top, barW, barH, 4);
+        dc.fillRoundedRectangle(left + barW, top + (barH - capH) / 2, capW, capH, 2);
+
+        var fillW = ((barW - pad * 2) * (percent / 100.0)).toNumber();
+        if (fillW > 0) {
+            dc.setColor(batteryColor(percent), Graphics.COLOR_TRANSPARENT);
+            dc.fillRoundedRectangle(left + pad, top + pad, fillW, barH - pad * 2, 2);
+        }
+
+        return barH;
+    }
+
     function onUpdate(dc as Dc) as Void {
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
         dc.clear();
@@ -77,27 +113,36 @@ class Charging_screenView extends WatchUi.View {
         }
 
         if (!mIsCharging) {
-            dc.drawText(centerX, height / 2 - 20, Graphics.FONT_MEDIUM, "Not charging", Graphics.TEXT_JUSTIFY_CENTER);
-            dc.drawText(centerX, height / 2 + 20, Graphics.FONT_XTINY, "Connect watch to charger", Graphics.TEXT_JUSTIFY_CENTER);
+            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(centerX, height / 2 - 30, Graphics.FONT_MEDIUM, "Not charging", Graphics.TEXT_JUSTIFY_CENTER);
+            drawBatteryIcon(dc, centerX, height / 2, mLastBattery as Float);
+            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(centerX, height / 2 + 45, Graphics.FONT_XTINY, "Connect watch to charger", Graphics.TEXT_JUSTIFY_CENTER);
             return;
         }
 
         var elapsedMs = System.getTimer() - (mStartTimeMs as Number);
         var elapsedMin = elapsedMs / 60000.0;
         var deltaPercent = (mLastBattery as Float) - (mStartBattery as Float);
+        var battColor = batteryColor(mLastBattery as Float);
 
         // Exact font heights from the device
         var bigH   = dc.getFontHeight(Graphics.FONT_NUMBER_MEDIUM);
         var smallH = dc.getFontHeight(Graphics.FONT_TINY);
         var tinyH  = dc.getFontHeight(Graphics.FONT_XTINY);
+        var iconH  = 36 + 10; // icon height + spacing below it
 
         if (elapsedMin < 0.5 || deltaPercent <= 0) {
-            // 3 rows: big%, calculating, measured — center the block
-            var totalH = bigH + tinyH + tinyH;
+            // rows: icon, big%, calculating, measured — center the block
+            var totalH = iconH + bigH + tinyH + tinyH;
             var y = (height - totalH) / 2;
 
+            y += drawBatteryIcon(dc, centerX, y, mLastBattery as Float) + 10;
+
+            dc.setColor(battColor, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, y, Graphics.FONT_NUMBER_MEDIUM, (mLastBattery as Float).format("%.0f") + "%", Graphics.TEXT_JUSTIFY_CENTER);
             y += bigH;
+            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, y, Graphics.FONT_XTINY, "Calculating charging rate...", Graphics.TEXT_JUSTIFY_CENTER);
             y += tinyH;
             dc.drawText(centerX, y, Graphics.FONT_XTINY, "Measured " + elapsedMin.format("%.1f") + " min", Graphics.TEXT_JUSTIFY_CENTER);
@@ -109,13 +154,17 @@ class Charging_screenView extends WatchUi.View {
         var remainingPercent = 100.0 - (mLastBattery as Float);
         var minutesToFull = remainingPercent * minPerPercent;
 
-        // 5 rows: big%, %/min, min/%, time, measured — center the block
-        var totalH = bigH + smallH + smallH + smallH + tinyH;
+        // rows: icon, big%, %/min, min/%, time, measured — center the block
+        var totalH = iconH + bigH + smallH + smallH + smallH + tinyH;
         var y = (height - totalH) / 2;
 
+        y += drawBatteryIcon(dc, centerX, y, mLastBattery as Float) + 10;
+
+        dc.setColor(battColor, Graphics.COLOR_TRANSPARENT);
         dc.drawText(centerX, y, Graphics.FONT_NUMBER_MEDIUM, (mLastBattery as Float).format("%.0f") + "%", Graphics.TEXT_JUSTIFY_CENTER);
         y += bigH;
 
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(centerX, y, Graphics.FONT_TINY, percentPerMin.format("%.2f") + "% per minute", Graphics.TEXT_JUSTIFY_CENTER);
         y += smallH;
         dc.drawText(centerX, y, Graphics.FONT_TINY, minPerPercent.format("%.1f") + " min per percent", Graphics.TEXT_JUSTIFY_CENTER);
@@ -131,6 +180,7 @@ class Charging_screenView extends WatchUi.View {
         }
         y += smallH;
 
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(centerX, y, Graphics.FONT_XTINY, "Measured " + elapsedMin.format("%.0f") + " min (hold for menu to reset)", Graphics.TEXT_JUSTIFY_CENTER);
     }
 
