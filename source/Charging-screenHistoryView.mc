@@ -73,6 +73,13 @@ class Charging_screenHistoryView extends WatchUi.View {
             y += rowH;
         }
 
+        var usualHour = ChargeStats.getUsualStartHour();
+        if (usualHour != null) {
+            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(centerX, y, Graphics.FONT_XTINY, "Usually starts ~" + (usualHour as Number).format("%02d") + ":00", Graphics.TEXT_JUSTIFY_CENTER);
+            y += rowH;
+        }
+
         // Health trend: how the recent (EMA) charge rate compares to the rate baseline
         // locked in from the first few sessions - an indirect signal of battery degradation
         // (see ChargeStats.BASELINE_SESSIONS).

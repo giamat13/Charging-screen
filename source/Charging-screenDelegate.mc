@@ -1,14 +1,10 @@
 import Toybox.Lang;
 import Toybox.WatchUi;
-import Toybox.Application.Storage;
 
 class Charging_screenDelegate extends WatchUi.BehaviorDelegate {
 
-    private var mView as Charging_screenView;
-
-    function initialize(view as Charging_screenView) {
+    function initialize() {
         BehaviorDelegate.initialize();
-        mView = view;
     }
 
     function onMenu() as Boolean {
@@ -17,17 +13,18 @@ class Charging_screenDelegate extends WatchUi.BehaviorDelegate {
         menu.addItem("Reset measurement", :reset);
         menu.addItem("Charge history", :history);
         menu.addItem("Battery 24h", :batteryGraph);
-
-        var bgEnabled = Storage.getValue("bgMonitoringEnabled") as Boolean?;
-        bgEnabled = (bgEnabled == null) ? true : bgEnabled;
-        menu.addItem(bgEnabled ? "Background check: On" : "Background check: Off", :toggleBackground);
-
-        WatchUi.pushView(menu, new Charging_screenMenuDelegate(mView), WatchUi.SLIDE_UP);
+        WatchUi.pushView(menu, new Charging_screenMenuDelegate(), WatchUi.SLIDE_UP);
         return true;
     }
 
+    // While charging, the next page is the rate/health Details screen; otherwise there's no
+    // active session to detail, so skip straight to History.
     function onNextPage() as Boolean {
-        WatchUi.pushView(new Charging_screenHistoryView(), new Charging_screenHistoryDelegate(), WatchUi.SLIDE_LEFT);
+        if (getApp().mIsCharging) {
+            pushDetails();
+        } else {
+            pushHistory();
+        }
         return true;
     }
 

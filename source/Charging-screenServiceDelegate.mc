@@ -33,8 +33,7 @@ class Charging_screenServiceDelegate extends System.ServiceDelegate {
                 var start = Storage.getValue("bgSessionStart") as Dictionary?;
                 if (start != null) {
                     var elapsedMin = (Time.now().value() - (start["time"] as Number)) / 60.0;
-                    var deltaPercent = (stats.battery as Float) - (start["battery"] as Float);
-                    ChargeStats.recordSession(deltaPercent, elapsedMin);
+                    ChargeStats.recordSession(start["battery"] as Float, stats.battery as Float, elapsedMin);
                 }
                 Storage.deleteValue("bgSessionStart");
             }
