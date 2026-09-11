@@ -1,5 +1,6 @@
 import Toybox.Lang;
 import Toybox.WatchUi;
+import Toybox.Application.Storage;
 
 class Charging_screenDelegate extends WatchUi.BehaviorDelegate {
 
@@ -15,6 +16,12 @@ class Charging_screenDelegate extends WatchUi.BehaviorDelegate {
         menu.setTitle("Menu");
         menu.addItem("Reset measurement", :reset);
         menu.addItem("Charge history", :history);
+        menu.addItem("Battery 24h", :batteryGraph);
+
+        var bgEnabled = Storage.getValue("bgMonitoringEnabled") as Boolean?;
+        bgEnabled = (bgEnabled == null) ? true : bgEnabled;
+        menu.addItem(bgEnabled ? "Background check: On" : "Background check: Off", :toggleBackground);
+
         WatchUi.pushView(menu, new Charging_screenMenuDelegate(mView), WatchUi.SLIDE_UP);
         return true;
     }

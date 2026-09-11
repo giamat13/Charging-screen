@@ -73,37 +73,12 @@ class Charging_screenView extends WatchUi.View {
         mTimer.start(method(:onTimerTick), UPDATE_INTERVAL_MS, true);
     }
 
-    // Persists this session's result so future sessions have a stored average rate and a
-    // history entry, then resets the measurement start point for the new (idle) state.
+    // Persists this session's result (via the shared ChargeStats module, also used by the
+    // background check) then resets the measurement start point for the new (idle) state.
     private function finishSession() as Void {
         var elapsedMin = (System.getTimer() - (mStartTimeMs as Number)) / 60000.0;
         var deltaPercent = (mLastBattery as Float) - (mStartBattery as Float);
-
-        if (elapsedMin >= 0.5 && deltaPercent > 0) {
-            var rate = deltaPercent / elapsedMin;
-            var prevAvg = Storage.getValue("avgPercentPerMin") as Float?;
-            var newAvg = (prevAvg == null) ? rate : (prevAvg * 0.7 + rate * 0.3);
-            Storage.setValue("avgPercentPerMin", newAvg);
-
-            var prevBest = Storage.getValue("bestPercentPerMin") as Float?;
-            if (prevBest == null || rate > prevBest) {
-                Storage.setValue("bestPercentPerMin", rate);
-            }
-
-            var history = Storage.getValue("chargeHistory") as Array?;
-            if (history == null) {
-                history = [];
-            }
-            history.add({
-                "endTime" => Time.now().value(),
-                "durationMin" => elapsedMin,
-                "percentGained" => deltaPercent,
-            });
-            while (history.size() > 10) {
-                history.remove(history[0]);
-            }
-            Storage.setValue("chargeHistory", history);
-        }
+        ChargeStats.recordSession(deltaPercent, elapsedMin);
     }
 
     function onTimerTick() as Void {
@@ -276,6 +251,16 @@ class Charging_screenView extends WatchUi.View {
             drawBatteryIcon(dc, centerX, height / 2, mLastBattery as Float);
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, height / 2 + 45, Graphics.FONT_XTINY, "Connect watch to charger", Graphics.TEXT_JUSTIFY_CENTER);
+
+            // Estimate based on the drain rate the background check has been learning from
+            // this watch's actual usage (see ChargeStats.recordDrainSample) - only available
+            // once it's had a couple of not-charging hours to sample.
+            var drainPerHour = Storage.getValue("avgDrainPerHour") as Float?;
+            if (drainPerHour != null && drainPerHour > 0) {
+                var totalMin = ((mLastBattery as Float) / drainPerHour * 60).toNumber();
+                dc.drawText(centerX, height / 2 + 65, Graphics.FONT_XTINY,
+                    "~" + (totalMin / 60) + "h " + (totalMin % 60) + "m left (your pace)", Graphics.TEXT_JUSTIFY_CENTER);
+            }
             return;
         }
 

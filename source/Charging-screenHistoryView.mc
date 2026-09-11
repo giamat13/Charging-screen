@@ -70,8 +70,33 @@ class Charging_screenHistoryView extends WatchUi.View {
         if (best != null) {
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, y, Graphics.FONT_XTINY, "Best: " + (best as Float).format("%.2f") + "%/min", Graphics.TEXT_JUSTIFY_CENTER);
-            y += rowH + 4;
+            y += rowH;
         }
+
+        // Health trend: how the recent (EMA) charge rate compares to the rate baseline
+        // locked in from the first few sessions - an indirect signal of battery degradation
+        // (see ChargeStats.BASELINE_SESSIONS).
+        var baseline = Storage.getValue("baselineRate") as Float?;
+        var recent = Storage.getValue("avgPercentPerMin") as Float?;
+        if (baseline != null && recent != null && baseline > 0) {
+            var changePct = (recent - baseline) / baseline * 100.0;
+            var installTime = Storage.getValue("installTime") as Number?;
+            var sinceStr = "";
+            if (installTime != null) {
+                var days = (Time.now().value() - installTime) / 86400;
+                sinceStr = " (" + days + "d)";
+            }
+            dc.setColor(changePct >= -5.0 ? Graphics.COLOR_LT_GRAY : Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(centerX, y, Graphics.FONT_XTINY, "Rate " + changePct.format("%.0f") + "% vs baseline" + sinceStr, Graphics.TEXT_JUSTIFY_CENTER);
+            y += rowH;
+        } else {
+            var sessionCount = Storage.getValue("sessionCount") as Number?;
+            sessionCount = (sessionCount == null) ? 0 : sessionCount;
+            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(centerX, y, Graphics.FONT_XTINY, "Baseline: " + sessionCount + "/" + ChargeStats.BASELINE_SESSIONS + " sessions", Graphics.TEXT_JUSTIFY_CENTER);
+            y += rowH;
+        }
+        y += 4;
 
         if (history == null || history.size() == 0) {
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);

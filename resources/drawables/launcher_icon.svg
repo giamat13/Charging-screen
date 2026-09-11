@@ -1,13 +1,13 @@
 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Background -->
-  <rect width="24" height="24" fill="#000000"/>
+  <rect width="24" height="24" rx="5" fill="#101418"/>
 
-  <!-- Battery body -->
-  <rect x="4" y="6" width="14" height="12" rx="1.5" fill="none" stroke="#F4F4F4" stroke-width="1.5"/>
+  <!-- Watch bezel ring -->
+  <circle cx="12" cy="12" r="9" fill="none" stroke="#2A3138" stroke-width="1.6"/>
 
-  <!-- Battery terminal -->
-  <rect x="19" y="10" width="1.5" height="4" fill="#F4F4F4"/>
+  <!-- Charge progress arc -->
+  <path d="M12 3a9 9 0 1 1 -6.36 15.36" fill="none" stroke="#4CD964" stroke-width="1.6" stroke-linecap="round"/>
 
-  <!-- Lightning bolt (charging indicator) -->
-  <path d="M12 8L10 12H12.5L10.5 16L14.5 10H12L13 8Z" fill="#F4F4F4"/>
+  <!-- Lightning bolt -->
+  <path d="M13.2 4.8L7.6 13.4H11.4L10.4 19.2L17 10.1H13.1L13.2 4.8Z" fill="#FFD23F"/>
 </svg>
