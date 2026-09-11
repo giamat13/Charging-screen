@@ -13,8 +13,13 @@ class Charging_screenMenuDelegate extends WatchUi.MenuInputDelegate {
     function onMenuItem(item as Symbol) as Void {
         if (item == :reset) {
             mView.resetStats();
+            WatchUi.popView(WatchUi.SLIDE_DOWN);
+        } else if (item == :history) {
+            WatchUi.popView(WatchUi.SLIDE_DOWN);
+            WatchUi.pushView(new Charging_screenHistoryView(), new Charging_screenHistoryDelegate(), WatchUi.SLIDE_LEFT);
+        } else {
+            WatchUi.popView(WatchUi.SLIDE_DOWN);
         }
-        WatchUi.popView(WatchUi.SLIDE_DOWN);
     }
 
 }
