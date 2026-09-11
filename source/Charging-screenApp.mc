@@ -52,7 +52,7 @@ class Charging_screenApp extends Application.AppBase {
             Storage.setValue("installTime", Time.now().value());
         }
 
-        applyBackgroundSchedule();
+        applyBackgroundSchedule(false);
 
         resetStats();
         mTimer = new Timer.Timer();
@@ -62,17 +62,34 @@ class Charging_screenApp extends Application.AppBase {
     // Registers (or cancels) the background temporal event to match the "Background check"
     // / "Check interval" settings - configured from the Garmin Connect app on the phone
     // (resources/settings/properties.xml), not on the watch.
-    private function applyBackgroundSchedule() as Void {
-        if (ChargeStats.isBackgroundEnabled()) {
-            Background.registerForTemporalEvent(new Time.Duration(ChargeStats.getIntervalSeconds()));
-        } else {
+    //
+    // Temporal events can't be (re)registered less than 5 minutes after the last one fired -
+    // and unlike a one-shot Moment, that restriction does NOT get cleared just because the app
+    // restarted while using a recurring Duration (which is what getIntervalSeconds() gives us).
+    // Re-registering unconditionally on every app open was throwing an uncaught
+    // InvalidBackgroundTimeException whenever the app was reopened within that window, which
+    // silently killed the background schedule - this is why logging looked like it wasn't
+    // running. Only (re)register when actually needed: nothing registered yet, or the caller
+    // (a settings change) explicitly wants to force it.
+    private function applyBackgroundSchedule(forceReregister as Boolean) as Void {
+        if (!ChargeStats.isBackgroundEnabled()) {
             Background.deleteTemporalEvent();
+            return;
+        }
+        if (!forceReregister && Background.getTemporalEventRegisteredTime() != null) {
+            return;
+        }
+        try {
+            Background.registerForTemporalEvent(new Time.Duration(ChargeStats.getIntervalSeconds()));
+        } catch (e instanceof Background.InvalidBackgroundTimeException) {
+            // Too soon after the last background event fired; leave the previous
+            // registration (if any) in place instead of crashing app startup.
         }
     }
 
     // Called when the user changes a setting from the Garmin Connect app on the phone.
     function onSettingsChanged() as Void {
-        applyBackgroundSchedule();
+        applyBackgroundSchedule(true);
         WatchUi.requestUpdate();
     }
 
