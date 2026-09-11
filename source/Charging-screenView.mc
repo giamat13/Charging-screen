@@ -4,6 +4,7 @@ import Toybox.System;
 import Toybox.Timer;
 import Toybox.Lang;
 import Toybox.Time;
+import Toybox.Sensor;
 import Toybox.Application.Storage;
 
 // Application that runs only in the foreground (not in background). Enters it during charging,
@@ -37,6 +38,12 @@ class Charging_screenView extends WatchUi.View {
     // ponytail: fixed heuristic, not a per-device learned curve - revisit if real logs show it's off.
     private const TRICKLE_START = 80.0;
     private const TRICKLE_MULTIPLIER = 2.5;
+
+    // Consecutive ticks the session rate must stay below the average by ANOMALY_THRESHOLD_PCT
+    // before flagging it, so a single noisy sample doesn't trigger a false "check your cable".
+    private var mSlowStreak as Number = 0;
+    private const ANOMALY_STREAK_THRESHOLD = 4;
+    private const ANOMALY_THRESHOLD_PCT = -30.0;
 
     function initialize() {
         View.initialize();
@@ -78,6 +85,11 @@ class Charging_screenView extends WatchUi.View {
             var newAvg = (prevAvg == null) ? rate : (prevAvg * 0.7 + rate * 0.3);
             Storage.setValue("avgPercentPerMin", newAvg);
 
+            var prevBest = Storage.getValue("bestPercentPerMin") as Float?;
+            if (prevBest == null || rate > prevBest) {
+                Storage.setValue("bestPercentPerMin", rate);
+            }
+
             var history = Storage.getValue("chargeHistory") as Array?;
             if (history == null) {
                 history = [];
@@ -111,6 +123,16 @@ class Charging_screenView extends WatchUi.View {
                     downsampled.add(mSamples[i]);
                 }
                 mSamples = downsampled;
+            }
+
+            var elapsedMin = (System.getTimer() - (mStartTimeMs as Number)) / 60000.0;
+            var deltaPercent = (stats.battery as Float) - (mStartBattery as Float);
+            if (mStoredAvgRate != null && (mStoredAvgRate as Float) > 0 && elapsedMin >= 0.5 && deltaPercent > 0) {
+                var rate = deltaPercent / elapsedMin;
+                var diffPct = (rate - (mStoredAvgRate as Float)) / (mStoredAvgRate as Float) * 100.0;
+                mSlowStreak = (diffPct <= ANOMALY_THRESHOLD_PCT) ? mSlowStreak + 1 : 0;
+            } else {
+                mSlowStreak = 0;
             }
         }
 
@@ -190,6 +212,16 @@ class Charging_screenView extends WatchUi.View {
         dc.drawText(width - 8, 4, Graphics.FONT_XTINY, timeStr, Graphics.TEXT_JUSTIFY_RIGHT);
     }
 
+    // Draws the device temperature in the top-left corner, on devices with a thermometer.
+    private function drawTemperature(dc as Dc) as Void {
+        var temperature = Sensor.getInfo().temperature;
+        if (temperature == null) {
+            return;
+        }
+        dc.setColor((temperature as Number) >= 40 ? Graphics.COLOR_ORANGE : Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(8, 4, Graphics.FONT_XTINY, temperature.format("%.0f") + "°C", Graphics.TEXT_JUSTIFY_LEFT);
+    }
+
     // Thin polyline of this session's battery% samples, showing the charging trend at a glance.
     private function drawSparkline(dc as Dc, centerX as Number, y as Number, w as Number, h as Number) as Void {
         if (mSamples.size() < 2) {
@@ -231,6 +263,7 @@ class Charging_screenView extends WatchUi.View {
         var centerX = width / 2;
 
         drawClock(dc, width);
+        drawTemperature(dc);
 
         if (mLastBattery == null || mStartBattery == null || mStartTimeMs == null) {
             dc.drawText(centerX, height / 2, Graphics.FONT_SMALL, "Loading...", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -285,9 +318,13 @@ class Charging_screenView extends WatchUi.View {
         var minPerPercent = 1.0 / percentPerMin;
         var minutesToFull = estimateMinutesToFull(mLastBattery as Float, minPerPercent);
 
-        // rows: icon, sparkline, big%, %/min, min/%, gained, time, measured — center the block
+        var haveAvgRate = mStoredAvgRate != null && (mStoredAvgRate as Float) > 0;
+        var diffPct = haveAvgRate ? (percentPerMin - (mStoredAvgRate as Float)) / (mStoredAvgRate as Float) * 100.0 : 0.0;
+        var isAnomaly = mSlowStreak >= ANOMALY_STREAK_THRESHOLD;
+
+        // rows: icon, sparkline, big%, %/min, min/%, gained, time, health/anomaly, measured — center the block
         var sparkH = 16;
-        var totalH = iconH + sparkH + bigH + smallH + smallH + smallH + smallH + tinyH;
+        var totalH = iconH + sparkH + bigH + smallH + smallH + smallH + smallH + (haveAvgRate ? tinyH : 0) + tinyH;
         var y = (height - totalH) / 2;
 
         y += drawBatteryIcon(dc, centerX, y, mLastBattery as Float) + 6;
@@ -308,6 +345,17 @@ class Charging_screenView extends WatchUi.View {
 
         dc.drawText(centerX, y, Graphics.FONT_TINY, formatMinutesToFull(minutesToFull), Graphics.TEXT_JUSTIFY_CENTER);
         y += smallH;
+
+        if (isAnomaly) {
+            dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(centerX, y, Graphics.FONT_XTINY, "Slower than usual - check cable/charger", Graphics.TEXT_JUSTIFY_CENTER);
+            y += tinyH;
+        } else if (haveAvgRate) {
+            dc.setColor(diffPct >= 0 ? Graphics.COLOR_GREEN : Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
+            var dir = diffPct >= 0 ? "faster" : "slower";
+            dc.drawText(centerX, y, Graphics.FONT_XTINY, diffPct.abs().format("%.0f") + "% " + dir + " than usual", Graphics.TEXT_JUSTIFY_CENTER);
+            y += tinyH;
+        }
 
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(centerX, y, Graphics.FONT_XTINY, "Measured " + elapsedMin.format("%.0f") + " min (hold for menu to reset)", Graphics.TEXT_JUSTIFY_CENTER);
