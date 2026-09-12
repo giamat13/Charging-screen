@@ -3,7 +3,6 @@ import Toybox.WatchUi;
 import Toybox.Lang;
 import Toybox.Time;
 import Toybox.Time.Gregorian;
-import Toybox.Application.Storage;
 
 // Shows the last few completed charging sessions (swipe/next-page from the main screen).
 class Charging_screenHistoryView extends WatchUi.View {
@@ -47,35 +46,33 @@ class Charging_screenHistoryView extends WatchUi.View {
                 barH = 2;
             }
             var x = left + i * (barW + barGap);
-            dc.setColor(i == rates.size() - 1 ? Graphics.COLOR_GREEN : Graphics.COLOR_DK_GREEN, Graphics.COLOR_TRANSPARENT);
+            dc.setColor(i == rates.size() - 1 ? ChargingUi.STATUS_GOOD : ChargingUi.STATUS_GOOD_DIM, Graphics.COLOR_TRANSPARENT);
             dc.fillRectangle(x, y + h - barH, barW, barH);
         }
     }
 
     function onUpdate(dc as Dc) as Void {
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
+        dc.setColor(ChargingUi.TEXT_PRIMARY, ChargingUi.BG);
         dc.clear();
 
         var width = dc.getWidth();
         var centerX = width / 2;
         var rowH = dc.getFontHeight(Graphics.FONT_TINY);
 
-        var history = Storage.getValue("chargeHistory") as Array?;
-        var best = Storage.getValue("bestPercentPerMin") as Float?;
+        var history = DemoData.getValue("chargeHistory") as Array?;
+        var best = DemoData.getValue("bestPercentPerMin") as Float?;
 
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(centerX, 10, Graphics.FONT_SMALL, "Charge History", Graphics.TEXT_JUSTIFY_CENTER);
+        var y = ChargingUi.drawHeader(dc, width, ChargingUi.PAGE_HISTORY, "Charge History") + 8;
 
-        var y = 10 + rowH + 8;
         if (best != null) {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.setColor(ChargingUi.TEXT_SECONDARY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, y, Graphics.FONT_XTINY, "Best: " + (best as Float).format("%.2f") + "%/min", Graphics.TEXT_JUSTIFY_CENTER);
             y += rowH;
         }
 
         var usualHour = ChargeStats.getUsualStartHour();
         if (usualHour != null) {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.setColor(ChargingUi.TEXT_SECONDARY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, y, Graphics.FONT_XTINY, "Usually starts ~" + (usualHour as Number).format("%02d") + ":00", Graphics.TEXT_JUSTIFY_CENTER);
             y += rowH;
         }
@@ -83,30 +80,30 @@ class Charging_screenHistoryView extends WatchUi.View {
         // Health trend: how the recent (EMA) charge rate compares to the rate baseline
         // locked in from the first few sessions - an indirect signal of battery degradation
         // (see ChargeStats.BASELINE_SESSIONS).
-        var baseline = Storage.getValue("baselineRate") as Float?;
-        var recent = Storage.getValue("avgPercentPerMin") as Float?;
+        var baseline = DemoData.getValue("baselineRate") as Float?;
+        var recent = DemoData.getValue("avgPercentPerMin") as Float?;
         if (baseline != null && recent != null && baseline > 0) {
             var changePct = (recent - baseline) / baseline * 100.0;
-            var installTime = Storage.getValue("installTime") as Number?;
+            var installTime = DemoData.getValue("installTime") as Number?;
             var sinceStr = "";
             if (installTime != null) {
                 var days = (Time.now().value() - installTime) / 86400;
                 sinceStr = " (" + days + "d)";
             }
-            dc.setColor(changePct >= -5.0 ? Graphics.COLOR_LT_GRAY : Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
+            dc.setColor(changePct >= -5.0 ? ChargingUi.TEXT_SECONDARY : ChargingUi.STATUS_ALERT, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, y, Graphics.FONT_XTINY, "Rate " + changePct.format("%.0f") + "% vs baseline" + sinceStr, Graphics.TEXT_JUSTIFY_CENTER);
             y += rowH;
         } else {
-            var sessionCount = Storage.getValue("sessionCount") as Number?;
+            var sessionCount = DemoData.getValue("sessionCount") as Number?;
             sessionCount = (sessionCount == null) ? 0 : sessionCount;
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.setColor(ChargingUi.TEXT_SECONDARY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, y, Graphics.FONT_XTINY, "Baseline: " + sessionCount + "/" + ChargeStats.BASELINE_SESSIONS + " sessions", Graphics.TEXT_JUSTIFY_CENTER);
             y += rowH;
         }
         y += 4;
 
         if (history == null || history.size() == 0) {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.setColor(ChargingUi.TEXT_SECONDARY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, y, Graphics.FONT_XTINY, "No completed sessions yet", Graphics.TEXT_JUSTIFY_CENTER);
             return;
         }
@@ -126,7 +123,7 @@ class Charging_screenHistoryView extends WatchUi.View {
             var durationMin = (entry["durationMin"] as Float).toNumber();
             var durationStr = (durationMin / 60) + "h" + (durationMin % 60).format("%02d") + "m";
 
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.setColor(ChargingUi.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, y, Graphics.FONT_XTINY,
                 dateStr + "  " + durationStr + "  +" + (entry["percentGained"] as Float).format("%.0f") + "%",
                 Graphics.TEXT_JUSTIFY_CENTER);

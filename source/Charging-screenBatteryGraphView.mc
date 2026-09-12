@@ -3,7 +3,6 @@ import Toybox.WatchUi;
 import Toybox.Lang;
 import Toybox.System;
 import Toybox.Time;
-import Toybox.Application.Storage;
 
 // Battery level over a selectable time range (24h or 7d), from the background samples plus
 // the live current reading as the last point. Green segments = charging.
@@ -33,7 +32,7 @@ class Charging_screenBatteryGraphView extends WatchUi.View {
     }
 
     function onUpdate(dc as Dc) as Void {
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
+        dc.setColor(ChargingUi.TEXT_PRIMARY, ChargingUi.BG);
         dc.clear();
 
         var width = dc.getWidth();
@@ -43,12 +42,15 @@ class Charging_screenBatteryGraphView extends WatchUi.View {
 
         var windowSeconds = mRangeDays * 86400;
         var rangeLabel = (mRangeDays == 1) ? "24h" : (mRangeDays + "d");
-        dc.drawText(centerX, 10, Graphics.FONT_SMALL, "Battery " + rangeLabel, Graphics.TEXT_JUSTIFY_CENTER);
+        ChargingUi.drawHeader(dc, width, ChargingUi.PAGE_GRAPH, "Battery " + rangeLabel);
 
         var now = Time.now().value();
         var stats = System.getSystemStats();
+        var nowBattery = DemoData.isEnabled() ? DemoData.BATTERY : stats.battery as Float;
+        var nowCharging = DemoData.isEnabled() ? true : stats.charging as Boolean;
+
         var points = [] as Array<Array>;
-        var log = Storage.getValue("batteryLog") as Array?;
+        var log = DemoData.getValue("batteryLog") as Array?;
         if (log != null) {
             for (var i = 0; i < log.size(); i += 1) {
                 var p = log[i] as Array;
@@ -57,18 +59,18 @@ class Charging_screenBatteryGraphView extends WatchUi.View {
                 }
             }
         }
-        points.add([now, stats.battery, stats.charging]);
+        points.add([now, nowBattery, nowCharging]);
 
         // Inset the plot so it stays inside round screens.
         var left = width / 6;
         var right = width - width / 6;
-        var top = height / 4;
-        var bottom = height - height / 4;
+        var top = height / 3;
+        var bottom = height - height / 5;
         var plotW = right - left;
         var plotH = bottom - top;
 
         dc.setPenWidth(1);
-        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(ChargingUi.TEXT_MUTED, Graphics.COLOR_TRANSPARENT);
         dc.drawRectangle(left, top, plotW, plotH);
         dc.drawLine(left, top + plotH / 2, right, top + plotH / 2);
         dc.drawText(left - 2, top - tinyH / 2, Graphics.FONT_XTINY, "100", Graphics.TEXT_JUSTIFY_RIGHT);
@@ -77,7 +79,7 @@ class Charging_screenBatteryGraphView extends WatchUi.View {
         dc.drawText(right, bottom + 2, Graphics.FONT_XTINY, "now", Graphics.TEXT_JUSTIFY_RIGHT);
 
         if (points.size() < 2) {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.setColor(ChargingUi.TEXT_SECONDARY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, top + plotH / 2 - tinyH, Graphics.FONT_XTINY, "Collecting data", Graphics.TEXT_JUSTIFY_CENTER);
             dc.drawText(centerX, top + plotH / 2, Graphics.FONT_XTINY, "(one sample per check)", Graphics.TEXT_JUSTIFY_CENTER);
         } else {
@@ -92,13 +94,13 @@ class Charging_screenBatteryGraphView extends WatchUi.View {
                 var x = left + ((((p[0] as Number) - windowStart) * plotW) / windowSeconds);
                 var y = bottom - ((p[1] as Float) / 100.0 * plotH).toNumber();
                 if (i > 0) {
-                    dc.setColor(charging ? Graphics.COLOR_GREEN : Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
+                    dc.setColor(charging ? ChargingUi.STATUS_GOOD : ChargingUi.STATUS_MID, Graphics.COLOR_TRANSPARENT);
                     dc.drawLine(prevX, prevY, x, y);
 
                     // Mark the plug-in / unplug transition itself, not just the color change,
                     // so a start/stop event is visible even at a glance on a 7-day-wide plot.
                     if (charging != prevCharging) {
-                        dc.setColor(charging ? Graphics.COLOR_GREEN : Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
+                        dc.setColor(charging ? ChargingUi.STATUS_GOOD : ChargingUi.STATUS_ALERT, Graphics.COLOR_TRANSPARENT);
                         dc.fillCircle(x, y, 3);
                     }
                 }
@@ -108,10 +110,9 @@ class Charging_screenBatteryGraphView extends WatchUi.View {
             }
         }
 
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(centerX, bottom + tinyH + 2, Graphics.FONT_XTINY, stats.battery.format("%.0f") + "% now", Graphics.TEXT_JUSTIFY_CENTER);
-        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(centerX, bottom + tinyH * 2 + 2, Graphics.FONT_XTINY, "Tap to change range", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.setColor(ChargingUi.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(centerX, bottom + tinyH + 2, Graphics.FONT_XTINY, nowBattery.format("%.0f") + "% now", Graphics.TEXT_JUSTIFY_CENTER);
+        ChargingUi.drawFooterHint(dc, width, height, "Tap to change range");
     }
 
 }

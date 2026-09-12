@@ -154,7 +154,7 @@ module ChargeStats {
 
     // The most common charge-start hour, or null until there's enough data to be meaningful.
     function getUsualStartHour() as Number? {
-        var counts = Storage.getValue("startHourCounts") as Array?;
+        var counts = DemoData.getValue("startHourCounts") as Array?;
         if (counts == null) {
             return null;
         }

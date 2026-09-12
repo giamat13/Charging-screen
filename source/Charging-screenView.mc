@@ -18,16 +18,6 @@ class Charging_screenView extends WatchUi.View {
         // No need for fixed layout from Rez - everything is drawn manually in onUpdate
     }
 
-    // Color for the battery level: red when low, yellow mid, green when high/full
-    private function batteryColor(percent as Float) as Graphics.ColorType {
-        if (percent >= 80) {
-            return Graphics.COLOR_GREEN;
-        } else if (percent >= 30) {
-            return Graphics.COLOR_YELLOW;
-        }
-        return Graphics.COLOR_RED;
-    }
-
     // Draws a horizontal battery icon (outline + cap + fill) centered at centerX, top at y.
     // Returns the total height consumed.
     private function drawBatteryIcon(dc as Dc, centerX as Number, y as Number, percent as Float) as Number {
@@ -41,32 +31,24 @@ class Charging_screenView extends WatchUi.View {
         var top = y;
 
         dc.setPenWidth(2);
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(ChargingUi.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
         dc.drawRoundedRectangle(left, top, barW, barH, 4);
         dc.fillRoundedRectangle(left + barW, top + (barH - capH) / 2, capW, capH, 2);
 
         var fillW = ((barW - pad * 2) * (percent / 100.0)).toNumber();
         if (fillW > 0) {
-            dc.setColor(batteryColor(percent), Graphics.COLOR_TRANSPARENT);
+            dc.setColor(ChargingUi.batteryColor(percent), Graphics.COLOR_TRANSPARENT);
             dc.fillRoundedRectangle(left + pad, top + pad, fillW, barH - pad * 2, 2);
         }
 
         return barH;
     }
 
-    private function formatDuration(totalMinutes as Float) as String {
-        if (totalMinutes < 0 || totalMinutes > 1440) {
-            return "unknown";
-        }
-        var t = totalMinutes.toNumber();
-        return (t / 60) + "h " + (t % 60) + "m";
-    }
-
     // Draws the current time in the top-right corner.
     private function drawClock(dc as Dc, width as Number) as Void {
         var clockTime = System.getClockTime();
         var timeStr = clockTime.hour.format("%02d") + ":" + clockTime.min.format("%02d");
-        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(ChargingUi.TEXT_MUTED, Graphics.COLOR_TRANSPARENT);
         dc.drawText(width - 8, 4, Graphics.FONT_XTINY, timeStr, Graphics.TEXT_JUSTIFY_RIGHT);
     }
 
@@ -84,11 +66,11 @@ class Charging_screenView extends WatchUi.View {
 
         y += drawBatteryIcon(dc, centerX, y, battery) + 10;
 
-        dc.setColor(batteryColor(battery), Graphics.COLOR_TRANSPARENT);
+        dc.setColor(ChargingUi.batteryColor(battery), Graphics.COLOR_TRANSPARENT);
         dc.drawText(centerX, y, Graphics.FONT_NUMBER_MEDIUM, battery.format("%.0f") + "%", Graphics.TEXT_JUSTIFY_CENTER);
         y += bigH + 4;
 
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(ChargingUi.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(centerX, y, Graphics.FONT_MEDIUM, headline, Graphics.TEXT_JUSTIFY_CENTER);
         y += medH + 2;
 
@@ -97,19 +79,20 @@ class Charging_screenView extends WatchUi.View {
     }
 
     function onUpdate(dc as Dc) as Void {
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
+        dc.setColor(ChargingUi.TEXT_PRIMARY, ChargingUi.BG);
         dc.clear();
 
         var width = dc.getWidth();
         var height = dc.getHeight();
         var centerX = width / 2;
 
+        ChargingUi.drawPageDots(dc, width, ChargingUi.PAGE_MAIN);
         drawClock(dc, width);
 
         var app = getApp();
         var battery = app.mLastBattery;
         if (battery == null || app.mStartBattery == null || app.mStartTimeMs == null) {
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.setColor(ChargingUi.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, height / 2, Graphics.FONT_SMALL, "Loading...", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             return;
         }
@@ -118,9 +101,9 @@ class Charging_screenView extends WatchUi.View {
             var drainPerHour = Storage.getValue("avgDrainPerHour") as Float?;
             var subtitle = "Connect to charger";
             if (drainPerHour != null && (drainPerHour as Float) > 0) {
-                subtitle = "~" + formatDuration((battery as Float) / (drainPerHour as Float) * 60.0) + " left";
+                subtitle = "~" + ChargingUi.formatDuration((battery as Float) / (drainPerHour as Float) * 60.0) + " left";
             }
-            drawStatus(dc, centerX, height, battery as Float, "Not charging", subtitle, Graphics.COLOR_LT_GRAY);
+            drawStatus(dc, centerX, height, battery as Float, "Not charging", subtitle, ChargingUi.TEXT_SECONDARY);
             return;
         }
 
@@ -132,19 +115,19 @@ class Charging_screenView extends WatchUi.View {
             var avgRate = app.mStoredAvgRate;
             if (avgRate != null && (avgRate as Float) > 0) {
                 var estMinutes = ChargeStats.estimateMinutesToFull(battery as Float, avgRate as Float);
-                subtitle = "~" + formatDuration(estMinutes) + " (usual pace)";
+                subtitle = "~" + ChargingUi.formatDuration(estMinutes) + " (usual pace)";
             }
-            drawStatus(dc, centerX, height, battery as Float, "Charging", subtitle, Graphics.COLOR_LT_GRAY);
+            drawStatus(dc, centerX, height, battery as Float, "Charging", subtitle, ChargingUi.TEXT_SECONDARY);
             return;
         }
 
         var percentPerMin = deltaPercent / elapsedMin;
         var minutesToFull = ChargeStats.estimateMinutesToFull(battery as Float, percentPerMin);
-        var headline = formatDuration(minutesToFull) + " to full";
+        var headline = ChargingUi.formatDuration(minutesToFull) + " to full";
 
         var isAnomaly = app.mSlowStreak >= app.ANOMALY_STREAK_THRESHOLD;
         var subtitle = isAnomaly ? "Slower than usual" : "Swipe for details";
-        var subColor = isAnomaly ? Graphics.COLOR_RED : Graphics.COLOR_LT_GRAY;
+        var subColor = isAnomaly ? ChargingUi.STATUS_BAD : ChargingUi.TEXT_SECONDARY;
 
         drawStatus(dc, centerX, height, battery as Float, headline, subtitle, subColor);
     }

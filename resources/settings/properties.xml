@@ -3,11 +3,13 @@
     <properties>
         <property id="backgroundEnabled" type="boolean">true</property>
         <property id="backgroundIntervalMinutes" type="number">15</property>
+        <property id="demoDataEnabled" type="boolean">false</property>
     </properties>
 
     <strings>
         <string id="backgroundEnabledTitle">Background check</string>
         <string id="backgroundIntervalTitle">Check every</string>
+        <string id="demoDataEnabledTitle">Demo data (debug)</string>
     </strings>
 
     <settings>
@@ -21,6 +23,10 @@
                 <listEntry value="30">30 minutes</listEntry>
                 <listEntry value="60">60 minutes</listEntry>
             </settingConfig>
+        </setting>
+
+        <setting propertyKey="@Properties.demoDataEnabled" title="@Strings.demoDataEnabledTitle">
+            <settingConfig type="boolean" />
         </setting>
     </settings>
 </resources>

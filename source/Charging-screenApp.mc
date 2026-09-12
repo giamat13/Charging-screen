@@ -90,7 +90,7 @@ class Charging_screenApp extends Application.AppBase {
     // Called when the user changes a setting from the Garmin Connect app on the phone.
     function onSettingsChanged() as Void {
         applyBackgroundSchedule(true);
-        WatchUi.requestUpdate();
+        resetStats();
     }
 
     // onStop() is called when your application is exiting
@@ -103,6 +103,17 @@ class Charging_screenApp extends Application.AppBase {
 
     // Starts/resets the measurement start point
     function resetStats() as Void {
+        if (DemoData.isEnabled()) {
+            mStartTimeMs = System.getTimer() - (DemoData.ELAPSED_MIN * 60000).toNumber();
+            mStartBattery = DemoData.START_BATTERY;
+            mLastBattery = DemoData.BATTERY;
+            mIsCharging = true;
+            mSamples = DemoData.SAMPLES;
+            mStoredAvgRate = DemoData.getValue("avgPercentPerMin") as Float?;
+            WatchUi.requestUpdate();
+            return;
+        }
+
         var stats = System.getSystemStats();
         mStartTimeMs = System.getTimer();
         mStartBattery = stats.battery;
@@ -121,6 +132,12 @@ class Charging_screenApp extends Application.AppBase {
     }
 
     function onTimerTick() as Void {
+        if (DemoData.isEnabled()) {
+            // Frozen scenario - don't drift the fixed demo numbers or finish the "session".
+            WatchUi.requestUpdate();
+            return;
+        }
+
         var stats = System.getSystemStats();
         var wasCharging = mIsCharging;
         mLastBattery = stats.battery;
