@@ -62,7 +62,7 @@ class Charging_screenHistoryView extends WatchUi.View {
         var history = DemoData.getValue("chargeHistory") as Array?;
         var best = DemoData.getValue("bestPercentPerMin") as Float?;
 
-        var y = ChargingUi.drawHeader(dc, width, ChargingUi.PAGE_HISTORY, "Charge History") + 8;
+        var y = ChargingUi.drawHeader(dc, width, ChargingUi.PAGE_HISTORY, "Charge History", getApp().mIsCharging) + 8;
 
         if (best != null) {
             dc.setColor(ChargingUi.TEXT_SECONDARY, Graphics.COLOR_TRANSPARENT);

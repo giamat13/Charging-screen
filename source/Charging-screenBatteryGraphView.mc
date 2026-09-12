@@ -42,7 +42,7 @@ class Charging_screenBatteryGraphView extends WatchUi.View {
 
         var windowSeconds = mRangeDays * 86400;
         var rangeLabel = (mRangeDays == 1) ? "24h" : (mRangeDays + "d");
-        ChargingUi.drawHeader(dc, width, ChargingUi.PAGE_GRAPH, "Battery " + rangeLabel);
+        ChargingUi.drawHeader(dc, width, ChargingUi.PAGE_GRAPH, "Battery " + rangeLabel, getApp().mIsCharging);
 
         var now = Time.now().value();
         var stats = System.getSystemStats();

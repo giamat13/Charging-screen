@@ -58,9 +58,9 @@ class Charging_screenDetailsView extends WatchUi.View {
         var rowH = dc.getFontHeight(Graphics.FONT_TINY);
         var tinyH = dc.getFontHeight(Graphics.FONT_XTINY);
 
-        var y = ChargingUi.drawHeader(dc, width, ChargingUi.PAGE_DETAILS, "Details") + 10;
-
         var app = getApp();
+        var y = ChargingUi.drawHeader(dc, width, ChargingUi.PAGE_DETAILS, "Details", app.mIsCharging) + 10;
+
         if (!app.mIsCharging || app.mLastBattery == null) {
             dc.setColor(ChargingUi.TEXT_SECONDARY, Graphics.COLOR_TRANSPARENT);
             dc.drawText(centerX, height / 2, Graphics.FONT_XTINY, "No active session", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);

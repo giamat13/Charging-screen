@@ -42,16 +42,21 @@ module ChargingUi {
 
     // Small row of dots at the very top of every screen, current page filled in white, the
     // rest dim - a constant, glanceable "you are here" so swiping never feels disorienting.
-    function drawPageDots(dc as Dc, width as Number, currentPage as Number) as Number {
+    // detailsReachable controls whether the Details dot is drawn at all: that page only exists
+    // in the swipe sequence while charging (see Charging_screenDelegate.onNextPage), so showing
+    // it as an always-present 4th dot would misrepresent how many pages are actually reachable.
+    function drawPageDots(dc as Dc, width as Number, currentPage as Number, detailsReachable as Boolean) as Number {
         var radius = 2;
         var gap = 9;
-        var totalW = (PAGE_COUNT - 1) * gap;
+        var pageCount = detailsReachable ? PAGE_COUNT : PAGE_COUNT - 1;
+        var visibleCurrent = (!detailsReachable && currentPage > PAGE_DETAILS) ? currentPage - 1 : currentPage;
+        var totalW = (pageCount - 1) * gap;
         var startX = width / 2 - totalW / 2;
         var y = 7;
 
-        for (var i = 0; i < PAGE_COUNT; i += 1) {
+        for (var i = 0; i < pageCount; i += 1) {
             var x = startX + i * gap;
-            if (i == currentPage) {
+            if (i == visibleCurrent) {
                 dc.setColor(TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
                 dc.fillCircle(x, y, radius);
             } else {
@@ -65,8 +70,8 @@ module ChargingUi {
 
     // Standard screen header: page dots, then the screen title underneath. Returns the y to
     // continue drawing content from, so every screen's body starts at a consistent offset.
-    function drawHeader(dc as Dc, width as Number, currentPage as Number, title as String) as Number {
-        var dotsBottom = drawPageDots(dc, width, currentPage);
+    function drawHeader(dc as Dc, width as Number, currentPage as Number, title as String, detailsReachable as Boolean) as Number {
+        var dotsBottom = drawPageDots(dc, width, currentPage, detailsReachable);
         var y = dotsBottom + 6;
 
         dc.setColor(TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);

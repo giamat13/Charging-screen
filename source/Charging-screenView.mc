@@ -86,10 +86,10 @@ class Charging_screenView extends WatchUi.View {
         var height = dc.getHeight();
         var centerX = width / 2;
 
-        ChargingUi.drawPageDots(dc, width, ChargingUi.PAGE_MAIN);
+        var app = getApp();
+        ChargingUi.drawPageDots(dc, width, ChargingUi.PAGE_MAIN, app.mIsCharging);
         drawClock(dc, width);
 
-        var app = getApp();
         var battery = app.mLastBattery;
         if (battery == null || app.mStartBattery == null || app.mStartTimeMs == null) {
             dc.setColor(ChargingUi.TEXT_PRIMARY, Graphics.COLOR_TRANSPARENT);
