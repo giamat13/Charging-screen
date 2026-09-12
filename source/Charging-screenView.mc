@@ -114,7 +114,7 @@ class Charging_screenView extends WatchUi.View {
             var subtitle = "Calculating...";
             var avgRate = app.mStoredAvgRate;
             if (avgRate != null && (avgRate as Float) > 0) {
-                var estMinutes = ChargeStats.estimateMinutesToFull(battery as Float, avgRate as Float);
+                var estMinutes = ChargeStats.estimateMinutesToFull(battery as Float, avgRate as Float, 100.0);
                 subtitle = "~" + ChargingUi.formatDuration(estMinutes) + " (usual pace)";
             }
             drawStatus(dc, centerX, height, battery as Float, "Charging", subtitle, ChargingUi.TEXT_SECONDARY);
@@ -122,12 +122,33 @@ class Charging_screenView extends WatchUi.View {
         }
 
         var percentPerMin = deltaPercent / elapsedMin;
-        var minutesToFull = ChargeStats.estimateMinutesToFull(battery as Float, percentPerMin);
+        var minutesToFull = ChargeStats.estimateMinutesToFull(battery as Float, percentPerMin, 100.0);
         var headline = ChargingUi.formatDuration(minutesToFull) + " to full";
 
         var isAnomaly = app.mSlowStreak >= app.ANOMALY_STREAK_THRESHOLD;
         var subtitle = isAnomaly ? "Slower than usual" : "Swipe for details";
         var subColor = isAnomaly ? ChargingUi.STATUS_BAD : ChargingUi.TEXT_SECONDARY;
+
+        // A user-set goal ("X% by HH:MM") is more actionable than the generic swipe hint, so
+        // it takes over the subtitle line - but a rate anomaly still takes priority, since
+        // "check your cable" matters more than an on-track/behind readout.
+        if (!isAnomaly && ChargeGoal.isSet()) {
+            var goalPercent = ChargeGoal.getPercent() as Number;
+            if ((battery as Float) >= goalPercent) {
+                subtitle = "Goal reached: " + goalPercent + "%";
+                subColor = ChargingUi.STATUS_GOOD;
+            } else {
+                var minutesNeeded = ChargeStats.estimateMinutesToFull(battery as Float, percentPerMin, goalPercent.toFloat());
+                var minutesAvailable = ChargeGoal.minutesUntilGoalTime();
+                if (minutesNeeded <= minutesAvailable) {
+                    subtitle = "On track: " + goalPercent + "% by " + ChargeGoal.formatGoalTime();
+                    subColor = ChargingUi.STATUS_GOOD;
+                } else {
+                    subtitle = "Won't reach " + goalPercent + "% by " + ChargeGoal.formatGoalTime();
+                    subColor = ChargingUi.STATUS_ALERT;
+                }
+            }
+        }
 
         drawStatus(dc, centerX, height, battery as Float, headline, subtitle, subColor);
     }

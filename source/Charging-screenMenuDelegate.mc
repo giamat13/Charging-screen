@@ -17,6 +17,13 @@ class Charging_screenMenuDelegate extends WatchUi.MenuInputDelegate {
         } else if (item == :batteryGraph) {
             WatchUi.popView(WatchUi.SLIDE_DOWN);
             pushBatteryGraph();
+        } else if (item == :setGoal) {
+            WatchUi.popView(WatchUi.SLIDE_DOWN);
+            pushGoalPercentPicker();
+        } else if (item == :clearGoal) {
+            ChargeGoal.clear();
+            WatchUi.popView(WatchUi.SLIDE_DOWN);
+            WatchUi.requestUpdate();
         } else {
             WatchUi.popView(WatchUi.SLIDE_DOWN);
         }

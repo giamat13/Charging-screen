@@ -42,6 +42,13 @@ class Charging_screenApp extends Application.AppBase {
     // Seconds between each measurement update while the app is in the foreground.
     private const UPDATE_INTERVAL_MS = 15000;
 
+    // When charging stops mid-session, System.getTimer() at the moment it stopped - null
+    // while charging normally or fully idle. Session isn't actually ended until it's stayed
+    // disconnected for DISCONNECT_GRACE_MS straight, so a cable that slips out for a few
+    // seconds/minutes doesn't cut the session short.
+    private var mDisconnectedAtMs as Number?;
+    private const DISCONNECT_GRACE_MS = 5 * 60 * 1000;
+
     function initialize() {
         AppBase.initialize();
     }
@@ -126,9 +133,12 @@ class Charging_screenApp extends Application.AppBase {
 
     // Persists this session's result (via the shared ChargeStats module, also used by the
     // background check) then resets the measurement start point for the new (idle) state.
+    // Also clears any charge goal - it was set for this session, so it shouldn't silently
+    // carry over and apply to whatever charges next.
     private function finishSession() as Void {
         var elapsedMin = (System.getTimer() - (mStartTimeMs as Number)) / 60000.0;
         ChargeStats.recordSession(mStartBattery as Float, mLastBattery as Float, elapsedMin);
+        ChargeGoal.clear();
     }
 
     function onTimerTick() as Void {
@@ -139,14 +149,14 @@ class Charging_screenApp extends Application.AppBase {
         }
 
         var stats = System.getSystemStats();
-        var wasCharging = mIsCharging;
-        mLastBattery = stats.battery;
-        mIsCharging = stats.charging;
 
-        if (wasCharging && !mIsCharging) {
-            finishSession();
-            resetStats();
-        } else if (mIsCharging) {
+        if (stats.charging) {
+            // Charging (still, or again after a brief disconnect blip) - cancel any pending
+            // disconnect and keep tracking the session exactly as before.
+            mDisconnectedAtMs = null;
+            mLastBattery = stats.battery;
+            mIsCharging = true;
+
             mSamples.add(stats.battery as Float);
             if (mSamples.size() > MAX_SAMPLES) {
                 var downsampled = [] as Array<Float>;
@@ -165,6 +175,21 @@ class Charging_screenApp extends Application.AppBase {
             } else {
                 mSlowStreak = 0;
             }
+        } else if (mIsCharging) {
+            // Not charging right now, but we were - could be a cable that slipped out by
+            // accident. Don't end the session yet; only after DISCONNECT_GRACE_MS of staying
+            // disconnected. Keep showing the session as-is in the meantime.
+            if (mDisconnectedAtMs == null) {
+                mDisconnectedAtMs = System.getTimer();
+            } else if (System.getTimer() - (mDisconnectedAtMs as Number) >= DISCONNECT_GRACE_MS) {
+                mLastBattery = stats.battery;
+                mDisconnectedAtMs = null;
+                finishSession();
+                resetStats();
+            }
+        } else {
+            // Genuinely idle - no session to protect.
+            mLastBattery = stats.battery;
         }
 
         WatchUi.requestUpdate();

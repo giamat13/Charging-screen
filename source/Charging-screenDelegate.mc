@@ -13,6 +13,10 @@ class Charging_screenDelegate extends WatchUi.BehaviorDelegate {
         menu.addItem("Reset measurement", :reset);
         menu.addItem("Charge history", :history);
         menu.addItem("Battery 24h", :batteryGraph);
+        menu.addItem(ChargeGoal.isSet() ? "Change charge goal" : "Set charge goal", :setGoal);
+        if (ChargeGoal.isSet()) {
+            menu.addItem("Clear charge goal", :clearGoal);
+        }
         WatchUi.pushView(menu, new Charging_screenMenuDelegate(), WatchUi.SLIDE_UP);
         return true;
     }

@@ -111,19 +111,23 @@ module ChargeStats {
         Storage.setValue("chargeCurve", curve);
     }
 
-    // Minutes to reach 100% from currentPercent, using the learned per-bucket curve where
-    // available and falling back to the fixed fast/trickle shape (scaled by this session's
-    // own rate) for buckets that haven't been learned yet.
-    function estimateMinutesToFull(currentPercent as Float, fallbackRatePerMin as Float) as Float {
+    // Minutes to reach targetPercent (100% by default, i.e. full) from currentPercent, using
+    // the learned per-bucket curve where available and falling back to the fixed fast/trickle
+    // shape (scaled by this session's own rate) for buckets that haven't been learned yet.
+    function estimateMinutesToFull(currentPercent as Float, fallbackRatePerMin as Float, targetPercent as Float) as Float {
+        if (currentPercent >= targetPercent) {
+            return 0.0;
+        }
+
         var curve = Storage.getValue("chargeCurve") as Array?;
         var totalMin = 0.0;
         var pos = currentPercent;
         var bucket = (pos / BUCKET_WIDTH).toNumber();
         if (bucket > BUCKET_COUNT - 1) { bucket = BUCKET_COUNT - 1; }
 
-        while (pos < 100.0 && bucket < BUCKET_COUNT) {
+        while (pos < targetPercent && bucket < BUCKET_COUNT) {
             var bucketEnd = (bucket + 1) * BUCKET_WIDTH;
-            if (bucketEnd > 100.0) { bucketEnd = 100.0; }
+            if (bucketEnd > targetPercent) { bucketEnd = targetPercent; }
             var segPercent = bucketEnd - pos;
 
             var learnedRate = (curve != null) ? (curve[bucket] as Float?) : null;
