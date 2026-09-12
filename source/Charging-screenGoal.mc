@@ -31,11 +31,33 @@ module ChargeGoal {
         var deadline = Time.now().value() + hoursFromNow * 3600 + minutesFromNow * 60;
         Storage.setValue("goalPercent", percent);
         Storage.setValue("goalDeadline", deadline);
+        Storage.deleteValue("goalReachedNotified");
+        Storage.deleteValue("goalWarnedNotified");
     }
 
     function clear() as Void {
         Storage.deleteValue("goalPercent");
         Storage.deleteValue("goalDeadline");
+        Storage.deleteValue("goalReachedNotified");
+        Storage.deleteValue("goalWarnedNotified");
+    }
+
+    // Each vibration alert should fire once per goal, not once per timer tick - these track
+    // whether it already has, and are cleared whenever a (new) goal is set or cleared.
+    function wasReachedNotified() as Boolean {
+        return Storage.getValue("goalReachedNotified") == true;
+    }
+
+    function markReachedNotified() as Void {
+        Storage.setValue("goalReachedNotified", true);
+    }
+
+    function wasWarnedNotified() as Boolean {
+        return Storage.getValue("goalWarnedNotified") == true;
+    }
+
+    function markWarnedNotified() as Void {
+        Storage.setValue("goalWarnedNotified", true);
     }
 
     // Minutes from now until the goal's deadline - negative once the deadline has passed.

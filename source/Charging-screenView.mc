@@ -150,6 +150,14 @@ class Charging_screenView extends WatchUi.View {
             }
         }
 
+        // Waiting to see if a dropped connection reconnects (see App.onTimerTick /
+        // DISCONNECT_GRACE_MS) takes over the subtitle no matter what - it explains why the
+        // numbers above aren't moving, which matters more than the goal/anomaly readout.
+        if (app.isReconnectPending()) {
+            subtitle = "Reconnecting...";
+            subColor = ChargingUi.STATUS_ALERT;
+        }
+
         drawStatus(dc, centerX, height, battery as Float, headline, subtitle, subColor);
     }
 

@@ -6,6 +6,7 @@ import Toybox.Timer;
 import Toybox.Time;
 import Toybox.Background;
 import Toybox.Application.Storage;
+import Toybox.Attention;
 
 // Owns the live charging-session state and the polling timer, instead of the main View, so
 // the numbers keep updating even while a secondary screen (Details/History/...) is pushed on
@@ -49,8 +50,25 @@ class Charging_screenApp extends Application.AppBase {
     private var mDisconnectedAtMs as Number?;
     private const DISCONNECT_GRACE_MS = 5 * 60 * 1000;
 
+    // How far ahead of a goal deadline to warn "won't make it" - only worth flagging once
+    // there's little enough time left that the user could still act on it (unplug a slow
+    // charger, plug in a faster one, adjust their plan).
+    private const GOAL_WARNING_LEAD_MIN = 10.0;
+
     function initialize() {
         AppBase.initialize();
+    }
+
+    // Whether the app is in the post-disconnect grace window, still showing the session as
+    // charging while waiting to see if the cable was pulled by accident (see onTimerTick).
+    function isReconnectPending() as Boolean {
+        return mDisconnectedAtMs != null;
+    }
+
+    private function buzz(pattern as Array<Attention.VibeProfile>) as Void {
+        if (Attention has :vibrate) {
+            Attention.vibrate(pattern);
+        }
     }
 
     // onStart() is called on application start up
@@ -131,6 +149,37 @@ class Charging_screenApp extends Application.AppBase {
         WatchUi.requestUpdate();
     }
 
+    // Buzzes once when the goal % is reached, and once when it becomes clear the current pace
+    // won't make the deadline (with GOAL_WARNING_LEAD_MIN left to still act on it) - each only
+    // fires once per goal (see ChargeGoal.markReachedNotified/markWarnedNotified).
+    private function checkGoalVibration(battery as Float, rate as Float, haveRate as Boolean) as Void {
+        if (!ChargeGoal.isSet()) {
+            return;
+        }
+        var goalPercent = ChargeGoal.getPercent() as Number;
+
+        if (battery >= goalPercent) {
+            if (!ChargeGoal.wasReachedNotified()) {
+                buzz([new Attention.VibeProfile(50, 300), new Attention.VibeProfile(0, 150), new Attention.VibeProfile(50, 300)]);
+                ChargeGoal.markReachedNotified();
+            }
+            return;
+        }
+
+        if (!haveRate || ChargeGoal.wasWarnedNotified()) {
+            return;
+        }
+        var minutesAvailable = ChargeGoal.minutesUntilGoalTime();
+        if (minutesAvailable > GOAL_WARNING_LEAD_MIN) {
+            return;
+        }
+        var minutesNeeded = ChargeStats.estimateMinutesToFull(battery, rate, goalPercent.toFloat());
+        if (minutesNeeded > minutesAvailable) {
+            buzz([new Attention.VibeProfile(75, 700)]);
+            ChargeGoal.markWarnedNotified();
+        }
+    }
+
     // Persists this session's result (via the shared ChargeStats module, also used by the
     // background check) then resets the measurement start point for the new (idle) state.
     // Also clears any charge goal - it was set for this session, so it shouldn't silently
@@ -168,13 +217,18 @@ class Charging_screenApp extends Application.AppBase {
 
             var elapsedMin = (System.getTimer() - (mStartTimeMs as Number)) / 60000.0;
             var deltaPercent = (stats.battery as Float) - (mStartBattery as Float);
+            var rate = 0.0;
+            var haveRate = false;
             if (mStoredAvgRate != null && (mStoredAvgRate as Float) > 0 && elapsedMin >= 0.5 && deltaPercent > 0) {
-                var rate = deltaPercent / elapsedMin;
+                rate = deltaPercent / elapsedMin;
+                haveRate = true;
                 var diffPct = (rate - (mStoredAvgRate as Float)) / (mStoredAvgRate as Float) * 100.0;
                 mSlowStreak = (diffPct <= ANOMALY_THRESHOLD_PCT) ? mSlowStreak + 1 : 0;
             } else {
                 mSlowStreak = 0;
             }
+
+            checkGoalVibration(stats.battery as Float, rate, haveRate);
         } else if (mIsCharging) {
             // Not charging right now, but we were - could be a cable that slipped out by
             // accident. Don't end the session yet; only after DISCONNECT_GRACE_MS of staying

@@ -77,21 +77,21 @@ class Charging_screenHistoryView extends WatchUi.View {
             y += rowH;
         }
 
-        // Health trend: how the recent (EMA) charge rate compares to the rate baseline
-        // locked in from the first few sessions - an indirect signal of battery degradation
-        // (see ChargeStats.BASELINE_SESSIONS).
-        var baseline = DemoData.getValue("baselineRate") as Float?;
-        var recent = DemoData.getValue("avgPercentPerMin") as Float?;
-        if (baseline != null && recent != null && baseline > 0) {
-            var changePct = (recent - baseline) / baseline * 100.0;
+        // Battery health score: how the recent (EMA) charge rate compares to the rate
+        // baseline locked in from the first few sessions - an indirect signal of degradation
+        // (see ChargeStats.getHealthScore/BASELINE_SESSIONS).
+        var healthScore = ChargeStats.getHealthScore();
+        if (healthScore != null) {
             var installTime = DemoData.getValue("installTime") as Number?;
             var sinceStr = "";
             if (installTime != null) {
                 var days = (Time.now().value() - installTime) / 86400;
-                sinceStr = " (" + days + "d)";
+                sinceStr = " · " + days + "d";
             }
-            dc.setColor(changePct >= -5.0 ? ChargingUi.TEXT_SECONDARY : ChargingUi.STATUS_ALERT, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(centerX, y, Graphics.FONT_XTINY, "Rate " + changePct.format("%.0f") + "% vs baseline" + sinceStr, Graphics.TEXT_JUSTIFY_CENTER);
+            dc.setColor(ChargeStats.healthColor(healthScore as Number), Graphics.COLOR_TRANSPARENT);
+            dc.drawText(centerX, y, Graphics.FONT_XTINY,
+                "Health " + healthScore + "% (" + ChargeStats.healthLabel(healthScore as Number) + ")" + sinceStr,
+                Graphics.TEXT_JUSTIFY_CENTER);
             y += rowH;
         } else {
             var sessionCount = DemoData.getValue("sessionCount") as Number?;

@@ -1,4 +1,5 @@
 import Toybox.Lang;
+import Toybox.Graphics;
 import Toybox.Time;
 import Toybox.Time.Gregorian;
 import Toybox.Application.Storage;
@@ -154,6 +155,36 @@ module ChargeStats {
         var current = counts[hour] as Number?;
         counts[hour] = (current == null) ? 1 : current + 1;
         Storage.setValue("startHourCounts", counts);
+    }
+
+    // A 0-100 "how's my battery doing" score, derived from how the recent (EMA) charge rate
+    // compares to the baseline locked in from the first BASELINE_SESSIONS - the OS-reported
+    // battery % on these devices is already capacity-normalized, so rate drift is the only
+    // degradation signal available here. Null until a baseline exists (see recordSession).
+    function getHealthScore() as Number? {
+        var baseline = DemoData.getValue("baselineRate") as Float?;
+        var recent = DemoData.getValue("avgPercentPerMin") as Float?;
+        if (baseline == null || recent == null || (baseline as Float) <= 0) {
+            return null;
+        }
+        var changePct = ((recent as Float) - (baseline as Float)) / (baseline as Float) * 100.0;
+        var score = (100.0 + changePct).toNumber();
+        if (score > 100) { score = 100; }
+        if (score < 0) { score = 0; }
+        return score;
+    }
+
+    function healthLabel(score as Number) as String {
+        if (score >= 95) { return "Excellent"; }
+        if (score >= 85) { return "Good"; }
+        if (score >= 70) { return "Fair"; }
+        return "Degraded";
+    }
+
+    function healthColor(score as Number) as Graphics.ColorType {
+        if (score >= 85) { return ChargingUi.STATUS_GOOD; }
+        if (score >= 70) { return ChargingUi.STATUS_MID; }
+        return ChargingUi.STATUS_ALERT;
     }
 
     // The most common charge-start hour, or null until there's enough data to be meaningful.
