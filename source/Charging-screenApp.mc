@@ -78,10 +78,6 @@ class Charging_screenApp extends Application.AppBase {
         }
 
         applyBackgroundSchedule(false);
-
-        resetStats();
-        mTimer = new Timer.Timer();
-        mTimer.start(method(:onTimerTick), UPDATE_INTERVAL_MS, true);
     }
 
     // Registers (or cancels) the background temporal event to match the "Background check"
@@ -115,7 +111,9 @@ class Charging_screenApp extends Application.AppBase {
     // Called when the user changes a setting from the Garmin Connect app on the phone.
     function onSettingsChanged() as Void {
         applyBackgroundSchedule(true);
-        resetStats();
+        if (mTimer != null) { // foreground only, see getInitialView()
+            resetStats();
+        }
     }
 
     // onStop() is called when your application is exiting
@@ -251,6 +249,13 @@ class Charging_screenApp extends Application.AppBase {
 
     // Return the initial view of your application here
     function getInitialView() as [Views] or [Views, InputDelegates] {
+        // Foreground-only setup lives here, not in onStart(): this class is (:background), so
+        // onStart() also runs in the background process on every temporal event, where WatchUi
+        // (resetStats -> requestUpdate) and Timer aren't available. Doing it in onStart() threw
+        // an unhandled exception every tick before the service delegate could log a sample.
+        resetStats();
+        mTimer = new Timer.Timer();
+        mTimer.start(method(:onTimerTick), UPDATE_INTERVAL_MS, true);
         return [ new Charging_screenView(), new Charging_screenDelegate() ];
     }
 
