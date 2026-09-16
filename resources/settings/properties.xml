@@ -4,12 +4,14 @@
         <property id="backgroundEnabled" type="boolean">true</property>
         <property id="backgroundIntervalMinutes" type="number">15</property>
         <property id="demoDataEnabled" type="boolean">false</property>
+        <property id="disconnectAlertEnabled" type="boolean">true</property>
     </properties>
 
     <strings>
         <string id="backgroundEnabledTitle">Background check</string>
         <string id="backgroundIntervalTitle">Check every</string>
         <string id="demoDataEnabledTitle">Demo data (debug)</string>
+        <string id="disconnectAlertEnabledTitle">Disconnect alert</string>
     </strings>
 
     <settings>
@@ -26,6 +28,10 @@
         </setting>
 
         <setting propertyKey="@Properties.demoDataEnabled" title="@Strings.demoDataEnabledTitle">
+            <settingConfig type="boolean" />
+        </setting>
+
+        <setting propertyKey="@Properties.disconnectAlertEnabled" title="@Strings.disconnectAlertEnabledTitle">
             <settingConfig type="boolean" />
         </setting>
     </settings>

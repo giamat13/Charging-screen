@@ -7,6 +7,7 @@ import Toybox.Time;
 import Toybox.Background;
 import Toybox.Application.Storage;
 import Toybox.Attention;
+import Toybox.Application.Properties;
 
 // Owns the live charging-session state and the polling timer, instead of the main View, so
 // the numbers keep updating even while a secondary screen (Details/History/...) is pushed on
@@ -54,6 +55,21 @@ class Charging_screenApp extends Application.AppBase {
     // there's little enough time left that the user could still act on it (unplug a slow
     // charger, plug in a faster one, adjust their plan).
     private const GOAL_WARNING_LEAD_MIN = 10.0;
+
+    // --- Mid-session disconnect alert ---
+    // Distinct from mDisconnectedAtMs/DISCONNECT_GRACE_MS above, which is the (much longer,
+    // 5-minute) grace period before a session is considered over. This is a fast, foreground-
+    // only nag: if the cable comes out mid-session and stays out for a few seconds, buzz hard
+    // and repeatedly until it's plugged back in (or the app is closed), so a slipped cable
+    // doesn't go unnoticed while you're right there looking at the watch.
+    private var mAlertTimer as Timer.Timer?; // 1s poll, foreground-only (started/stopped with mTimer)
+    private var mVibrateTimer as Timer.Timer?; // non-null only while actively alerting
+    private var mDisconnectSinceMs as Number?; // when the alert poll first saw "not charging"
+    private const ALERT_THRESHOLD_MS = 5000; // how long disconnected before the alert starts
+    private const ALERT_POLL_MS = 1000;
+    private const ALERT_CYCLE_MS = 10000; // 5s strong vibrate + 5s silence, repeating
+    private const ALERT_VIBRATE_MS = 5000;
+    private const ALERT_STRENGTH = 100; // max vibration amplitude
 
     function initialize() {
         AppBase.initialize();
@@ -111,6 +127,9 @@ class Charging_screenApp extends Application.AppBase {
     // Called when the user changes a setting from the Garmin Connect app on the phone.
     function onSettingsChanged() as Void {
         applyBackgroundSchedule(true);
+        if (!isDisconnectAlertEnabled()) {
+            stopDisconnectAlert();
+        }
         if (mTimer != null) { // foreground only, see getInitialView()
             resetStats();
         }
@@ -122,10 +141,18 @@ class Charging_screenApp extends Application.AppBase {
             mTimer.stop();
             mTimer = null;
         }
+        if (mAlertTimer != null) {
+            mAlertTimer.stop();
+            mAlertTimer = null;
+        }
+        stopDisconnectAlert();
     }
 
     // Starts/resets the measurement start point
     function resetStats() as Void {
+        mDisconnectSinceMs = null;
+        stopDisconnectAlert();
+
         if (DemoData.isEnabled()) {
             mStartTimeMs = System.getTimer() - (DemoData.ELAPSED_MIN * 60000).toNumber();
             mStartBattery = DemoData.START_BATTERY;
@@ -247,6 +274,63 @@ class Charging_screenApp extends Application.AppBase {
         WatchUi.requestUpdate();
     }
 
+    // 1s foreground poll dedicated to the disconnect alert - kept separate from the coarser
+    // 15s mTimer/onTimerTick so a slipped cable is noticed (and alerted on) within ~5s instead
+    // of up to 15s late. Doesn't touch samples/goal/session state - onTimerTick still owns that.
+    function onAlertPollTick() as Void {
+        if (DemoData.isEnabled()) {
+            // Frozen demo scenario - nothing is really (dis)connecting.
+            return;
+        }
+
+        var charging = System.getSystemStats().charging;
+
+        if (!charging && mIsCharging) {
+            if (mDisconnectSinceMs == null) {
+                mDisconnectSinceMs = System.getTimer();
+            } else if (mVibrateTimer == null && System.getTimer() - (mDisconnectSinceMs as Number) >= ALERT_THRESHOLD_MS) {
+                startDisconnectAlert();
+            }
+        } else {
+            mDisconnectSinceMs = null;
+            stopDisconnectAlert();
+        }
+    }
+
+    private function isDisconnectAlertEnabled() as Boolean {
+        var enabled;
+        try {
+            enabled = Properties.getValue("disconnectAlertEnabled") as Boolean?;
+        } catch (e instanceof Lang.Exception) {
+            // Key isn't declared in properties.xml/settings.xml (yet) - default to on
+            // instead of crashing every disconnect.
+            return true;
+        }
+        return (enabled == null) ? true : enabled;
+    }
+
+    private function startDisconnectAlert() as Void {
+        if (!isDisconnectAlertEnabled()) {
+            return;
+        }
+        mVibrateTimer = new Timer.Timer();
+        mVibrateTimer.start(method(:onAlertVibrate), ALERT_CYCLE_MS, true);
+        onAlertVibrate(); // buzz immediately instead of waiting out the first full cycle
+    }
+
+    private function stopDisconnectAlert() as Void {
+        if (mVibrateTimer != null) {
+            mVibrateTimer.stop();
+            mVibrateTimer = null;
+        }
+    }
+
+    // One cycle: buzz hard for ALERT_VIBRATE_MS, then silent for the rest of ALERT_CYCLE_MS
+    // (the pause is implicit - it's just the time until this fires again).
+    function onAlertVibrate() as Void {
+        buzz([new Attention.VibeProfile(ALERT_STRENGTH, ALERT_VIBRATE_MS)]);
+    }
+
     // Return the initial view of your application here
     function getInitialView() as [Views] or [Views, InputDelegates] {
         // Foreground-only setup lives here, not in onStart(): this class is (:background), so
@@ -256,6 +340,8 @@ class Charging_screenApp extends Application.AppBase {
         resetStats();
         mTimer = new Timer.Timer();
         mTimer.start(method(:onTimerTick), UPDATE_INTERVAL_MS, true);
+        mAlertTimer = new Timer.Timer();
+        mAlertTimer.start(method(:onAlertPollTick), ALERT_POLL_MS, true);
         return [ new Charging_screenView(), new Charging_screenDelegate() ];
     }
 
